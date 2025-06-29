@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 class LineChartPainter extends CustomPainter {
@@ -9,9 +8,18 @@ class LineChartPainter extends CustomPainter {
 
   late final Paint dotPaint;
   late final Paint linePaint;
+  late final Paint gridPaint;
 
-  LineChartPainter(
-      {required this.data, required this.days, required this.primary}) {
+  final outlinePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.0
+    ..color = Colors.transparent;
+
+  LineChartPainter({
+    required this.data,
+    required this.days,
+    required this.primary,
+  }) {
     dotPaint = Paint()
       ..strokeWidth = 5.0
       ..style = PaintingStyle.fill
@@ -21,74 +29,67 @@ class LineChartPainter extends CustomPainter {
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke
       ..color = primary;
-  }
 
-  final outlinePaint = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 1.0
-    // ..color = Colors.black;
-    //
-    ..color = Colors.transparent;
+    gridPaint = Paint()
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke
+      ..color = primary;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final h = size.height;
     final w = size.width;
-    const padding = 100;
+    const padding = 100.0;
+
     final double blockW = (w - padding) / data.length;
-    final double blockH = (h - padding);
+    final double blockH = h - padding;
 
-    _drawContainerRect(
-        canvas, Offset(blockW / 2 + padding / 2, h / 2), blockW, blockH);
+    final Offset containerStart = Offset(blockW / 2 + padding / 2, h / 2);
+    _drawContainerRect(canvas, containerStart, blockW, blockH);
 
-    var top = data.reduce((a, b) => max(a, b));
-    List<Offset> dotPoint = [];
+    final top = data.reduce(max);
+    final List<Offset> dotPoints =
+        _drawDots(canvas, blockW, blockH, padding, top);
+    _drawLine(canvas, dotPoints);
+    _drawDayLabels(canvas, blockW, blockH, padding);
+    _drawGrid(canvas, blockW, blockH, size, padding, top, 10);
+  }
 
-    data.asMap().entries.forEach((entry) {
-      int index = entry.key;
-      int item = entry.value;
+  void _drawGrid(
+    Canvas canvas,
+    double blockW,
+    double blockH,
+    Size size,
+    double padding,
+    int top,
+    int space,
+  ) {
+    List<int> values =
+        List.generate(space + 1, (i) => (top / space * i).toInt());
 
-      double x = blockW / 2 + padding / 2 + (index * blockW);
-      double y = (blockH + padding / 2) - (item * (blockH / top));
-      Offset offset = Offset(x, y);
+    for (int i = 0; i < values.length; i++) {
+      double yValue = values[i].toDouble();
 
-      dotPoint.add(offset);
-      canvas.drawCircle(offset, 10, dotPaint);
-    });
+      double y = (blockH + padding / 2) - (yValue * (blockH / top));
 
-    Path linePath = Path();
-    dotPoint.asMap().entries.forEach((entry) {
-      int index = entry.key;
-      Offset offset = entry.value;
-      linePath.moveTo(offset.dx, offset.dy);
-      if (index + 1 != dotPoint.length) {
-        Offset next = dotPoint[index + 1];
-        linePath.lineTo(next.dx, next.dy);
-      }
-    });
-    canvas.drawPath(linePath, linePaint);
+      canvas.drawLine(
+        Offset(padding / 2, y),
+        Offset(size.width - padding / 2, y),
+        gridPaint,
+      );
 
-    days.asMap().entries.forEach((entry) {
-      int index = entry.key;
-      String day = entry.value;
+      final label = TextSpan(
+        text: yValue.toInt().toString(),
+        style: TextStyle(color: primary, fontSize: 12),
+      );
+      final tp = TextPainter(
+        text: label,
+        textDirection: TextDirection.ltr,
+      )..layout();
 
-      var textSpan = TextSpan(
-          text: day,
-          style: TextStyle(
-              color: primary, fontSize: 20, fontWeight: FontWeight.bold));
-
-      var textPainter =
-          TextPainter(text: textSpan, textDirection: TextDirection.ltr);
-      textPainter.layout();
-      textPainter.paint(
-          canvas,
-          Offset(
-              padding / 2 +
-                  (blockW * index) +
-                  blockW / 2 -
-                  textPainter.width / 2,
-              blockH + padding / 2 + textPainter.height - 5));
-    });
+      tp.paint(canvas, Offset(padding / 2 - tp.width - 5, y - tp.height / 2));
+    }
   }
 
   void _drawContainerRect(
@@ -101,8 +102,56 @@ class LineChartPainter extends CustomPainter {
     }
   }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
+  List<Offset> _drawDots(
+      Canvas canvas, double blockW, double blockH, double padding, int top) {
+    List<Offset> dotPoints = [];
+
+    for (int i = 0; i < data.length; i++) {
+      double x = blockW / 2 + padding / 2 + (i * blockW);
+      double y = (blockH + padding / 2) - (data[i] * (blockH / top));
+      Offset offset = Offset(x, y);
+      dotPoints.add(offset);
+      canvas.drawCircle(offset, 10, dotPaint);
+    }
+
+    return dotPoints;
   }
+
+  void _drawLine(Canvas canvas, List<Offset> dotPoints) {
+    Path path = Path();
+
+    for (int i = 0; i < dotPoints.length - 1; i++) {
+      path.moveTo(dotPoints[i].dx, dotPoints[i].dy);
+      path.lineTo(dotPoints[i + 1].dx, dotPoints[i + 1].dy);
+    }
+
+    canvas.drawPath(path, linePaint);
+  }
+
+  void _drawDayLabels(
+      Canvas canvas, double blockW, double blockH, double padding) {
+    for (int i = 0; i < days.length; i++) {
+      final textSpan = TextSpan(
+        text: days[i],
+        style: TextStyle(
+          color: primary,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      );
+
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final x = padding / 2 + blockW * i + blockW / 2 - textPainter.width / 2;
+      final y = blockH + padding / 2 + textPainter.height - 5;
+
+      textPainter.paint(canvas, Offset(x, y));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
