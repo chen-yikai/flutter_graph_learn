@@ -5,6 +5,7 @@ class LineChartPainter extends CustomPainter {
   final List<int> data;
   final List<String> days;
   final Color primary;
+  final AnimationController controller;
 
   late final Paint dotPaint;
   late final Paint linePaint;
@@ -15,11 +16,11 @@ class LineChartPainter extends CustomPainter {
     ..strokeWidth = 1.0
     ..color = Colors.transparent;
 
-  LineChartPainter({
-    required this.data,
-    required this.days,
-    required this.primary,
-  }) {
+  LineChartPainter(
+      {required this.data,
+      required this.days,
+      required this.primary,
+      required this.controller}) {
     dotPaint = Paint()
       ..strokeWidth = 5.0
       ..style = PaintingStyle.fill
@@ -108,7 +109,8 @@ class LineChartPainter extends CustomPainter {
 
     for (int i = 0; i < data.length; i++) {
       double x = blockW / 2 + padding / 2 + (i * blockW);
-      double y = (blockH + padding / 2) - (data[i] * (blockH / top));
+      double y = (blockH + padding / 2) -
+          (data[i] * controller.value * (blockH / top));
       Offset offset = Offset(x, y);
       dotPoints.add(offset);
       canvas.drawCircle(offset, 10, dotPaint);
